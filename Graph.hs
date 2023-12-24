@@ -20,38 +20,58 @@ edgeListToGraph edgeList = do
       neighbours <- Map.lookup nodeId' edgeList'
       return (Node (nodeId', mapMaybe (edgeListToGraphFrom edgeList') neighbours))
 
-graphToEdgeList :: Node -> EdgeList
-graphToEdgeList graph =
-  bfs [graph] Set.empty Map.empty
+graphToEdgeListBf :: Node -> EdgeList
+graphToEdgeListBf graph =
+  bf [graph] Set.empty Map.empty
   where
-    bfs :: [Node] -> Set Int -> EdgeList -> EdgeList
-    bfs [] _ edgeList = edgeList
-    bfs (Node (nodeId, neighbours) : nodes) visited edgeList =
+    bf :: [Node] -> Set Int -> EdgeList -> EdgeList
+    bf [] _ edgeList = edgeList
+    bf (Node (nodeId, neighbours) : nodes) visited edgeList =
       if nodeId `Set.member` visited
-        then bfs nodes visited edgeList
+        then bf nodes visited edgeList
         else
-          bfs
+          bf
             (nodes ++ neighbours)
+            (Set.insert nodeId visited)
+            (Map.insert nodeId (map (\(Node (neighbourNodeId, _)) -> neighbourNodeId) neighbours) edgeList)
+
+graphToEdgeListDf :: Node -> EdgeList
+graphToEdgeListDf graph =
+  df [graph] Set.empty Map.empty
+  where
+    df :: [Node] -> Set Int -> EdgeList -> EdgeList
+    df [] _ edgeList = edgeList
+    df (Node (nodeId, neighbours) : nodes) visited edgeList =
+      if nodeId `Set.member` visited
+        then df nodes visited edgeList
+        else
+          df
+            (neighbours ++ nodes)
             (Set.insert nodeId visited)
             (Map.insert nodeId (map (\(Node (neighbourNodeId, _)) -> neighbourNodeId) neighbours) edgeList)
 
 main :: IO ()
 main = do
   putStrLn "Input Edge List:"
-  print input
+  print $ Just input
 
-  putStrLn "One Round Trip:"
-  let oneRoundTrip = roundTrip $ Just input
-  print oneRoundTrip
+  putStrLn "Round Trip BF:"
+  let oneRoundTripBf = roundTripBf $ Just input
+  print oneRoundTripBf
 
-  putStrLn "Two Round Trips:"
-  let twoRoundTrips = roundTrip $ roundTrip $ Just input
-  print twoRoundTrips
+  putStrLn "Round Trip DF:"
+  let oneRoundTripDf = roundTripDf $ Just input
+  print oneRoundTripDf
+
+  putStrLn "Round Trips BF + DF:"
+  let twoRoundTripsBfDf = roundTripBf $ roundTripDf $ Just input
+  print twoRoundTripsBfDf
 
   putStrLn "Isomorphic:"
-  print $ oneRoundTrip == twoRoundTrips
+  print $ oneRoundTripBf == oneRoundTripDf && oneRoundTripBf == twoRoundTripsBfDf
   where
-    roundTrip maybeEdgeList = (maybeEdgeList >>= edgeListToGraph) <&> graphToEdgeList
+    roundTripDf maybeEdgeList = maybeEdgeList >>= edgeListToGraph <&> graphToEdgeListBf
+    roundTripBf maybeEdgeList = maybeEdgeList >>= edgeListToGraph <&> graphToEdgeListDf
     input :: EdgeList =
       Map.fromList
         [ (1, [2, 3]),
