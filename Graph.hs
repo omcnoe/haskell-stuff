@@ -8,8 +8,6 @@ import Data.Map qualified as Map
 import Data.Maybe (listToMaybe, mapMaybe)
 import Data.Sequence (Seq ((:<|)))
 import Data.Sequence qualified as Seq
-import Data.Set (Set)
-import Data.Set qualified as Set
 import GHC.IsList (IsList (fromList, toList))
 
 type EdgeList = Map Int [Int]
@@ -27,32 +25,30 @@ edgeListToGraph edgeList = do
 
 graphToEdgeListBf :: Node -> EdgeList
 graphToEdgeListBf graph =
-  bf [graph] Set.empty Map.empty
+  bf [graph] Map.empty
   where
-    bf :: Seq Node -> Set Int -> EdgeList -> EdgeList
-    bf Seq.Empty _ edgeList = edgeList
-    bf ((Node (nodeId, neighbours)) :<| remainingToVisit) visited edgeList =
-      if nodeId `Set.member` visited
-        then bf remainingToVisit visited edgeList
+    bf :: Seq Node -> EdgeList -> EdgeList
+    bf Seq.Empty edgeList = edgeList
+    bf ((Node (nodeId, neighbours)) :<| remainingToVisit) edgeList =
+      if nodeId `Map.member` edgeList
+        then bf remainingToVisit edgeList
         else
           bf
             (remainingToVisit <> fromList neighbours)
-            (Set.insert nodeId visited)
             (Map.insert nodeId (map (\(Node (neighbourNodeId, _)) -> neighbourNodeId) neighbours) edgeList)
 
 graphToEdgeListDf :: Node -> EdgeList
 graphToEdgeListDf graph =
-  df [graph] Set.empty Map.empty
+  df [graph] Map.empty
   where
-    df :: Seq Node -> Set Int -> EdgeList -> EdgeList
-    df Seq.Empty _ edgeList = edgeList
-    df ((Node (nodeId, neighbours)) :<| remainingToVisit) visited edgeList =
-      if nodeId `Set.member` visited
-        then df remainingToVisit visited edgeList
+    df :: Seq Node -> EdgeList -> EdgeList
+    df Seq.Empty edgeList = edgeList
+    df ((Node (nodeId, neighbours)) :<| remainingToVisit) edgeList =
+      if nodeId `Map.member` edgeList
+        then df remainingToVisit edgeList
         else
           df
             (fromList neighbours <> remainingToVisit)
-            (Set.insert nodeId visited)
             (Map.insert nodeId (map (\(Node (neighbourNodeId, _)) -> neighbourNodeId) neighbours) edgeList)
 
 main :: IO ()

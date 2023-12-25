@@ -6,6 +6,15 @@ license:            MIT
 author:             Oscar McNoe
 maintainer:         oscar.mcnoe@gmail.com
 
+executable astar
+    main-is:          AStar.hs
+    build-depends:
+        base       ^>=4.18.1.0,
+        containers ^>=0.6.8,
+        PSQueue    ^>=1.2.0
+    default-language: GHC2021
+    ghc-options:      -Wall
+
 executable graph
     main-is:          Graph.hs
     build-depends:
