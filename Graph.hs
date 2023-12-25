@@ -1,11 +1,16 @@
+{-# LANGUAGE OverloadedLists #-}
+
 module Main (main) where
 
 import Data.Functor ((<&>))
 import Data.Map (Map)
 import Data.Map qualified as Map
 import Data.Maybe (listToMaybe, mapMaybe)
+import Data.Sequence (Seq ((:<|)))
+import Data.Sequence qualified as Seq
 import Data.Set (Set)
 import Data.Set qualified as Set
+import GHC.IsList (IsList (fromList, toList))
 
 type EdgeList = Map Int [Int]
 
@@ -13,7 +18,7 @@ newtype Node = Node (Int, [Node])
 
 edgeListToGraph :: EdgeList -> Maybe Node
 edgeListToGraph edgeList = do
-  (nodeId, _) <- listToMaybe $ Map.toList edgeList
+  (nodeId, _) <- listToMaybe $ toList edgeList
   edgeListToGraphFrom edgeList nodeId
   where
     edgeListToGraphFrom edgeList' nodeId' = do
@@ -24,14 +29,14 @@ graphToEdgeListBf :: Node -> EdgeList
 graphToEdgeListBf graph =
   bf [graph] Set.empty Map.empty
   where
-    bf :: [Node] -> Set Int -> EdgeList -> EdgeList
-    bf [] _ edgeList = edgeList
-    bf (Node (nodeId, neighbours) : nodes) visited edgeList =
+    bf :: Seq Node -> Set Int -> EdgeList -> EdgeList
+    bf Seq.Empty _ edgeList = edgeList
+    bf ((Node (nodeId, neighbours)) :<| remainingToVisit) visited edgeList =
       if nodeId `Set.member` visited
-        then bf nodes visited edgeList
+        then bf remainingToVisit visited edgeList
         else
           bf
-            (nodes ++ neighbours)
+            (remainingToVisit <> fromList neighbours)
             (Set.insert nodeId visited)
             (Map.insert nodeId (map (\(Node (neighbourNodeId, _)) -> neighbourNodeId) neighbours) edgeList)
 
@@ -39,14 +44,14 @@ graphToEdgeListDf :: Node -> EdgeList
 graphToEdgeListDf graph =
   df [graph] Set.empty Map.empty
   where
-    df :: [Node] -> Set Int -> EdgeList -> EdgeList
-    df [] _ edgeList = edgeList
-    df (Node (nodeId, neighbours) : nodes) visited edgeList =
+    df :: Seq Node -> Set Int -> EdgeList -> EdgeList
+    df Seq.Empty _ edgeList = edgeList
+    df ((Node (nodeId, neighbours)) :<| remainingToVisit) visited edgeList =
       if nodeId `Set.member` visited
-        then df nodes visited edgeList
+        then df remainingToVisit visited edgeList
         else
           df
-            (neighbours ++ nodes)
+            (fromList neighbours <> remainingToVisit)
             (Set.insert nodeId visited)
             (Map.insert nodeId (map (\(Node (neighbourNodeId, _)) -> neighbourNodeId) neighbours) edgeList)
 
@@ -70,11 +75,9 @@ main = do
   putStrLn "Isomorphic:"
   print $ oneRoundTripBf == oneRoundTripDf && oneRoundTripBf == twoRoundTripsBfDf
   where
-    roundTripDf maybeEdgeList = maybeEdgeList >>= edgeListToGraph <&> graphToEdgeListBf
-    roundTripBf maybeEdgeList = maybeEdgeList >>= edgeListToGraph <&> graphToEdgeListDf
+    roundTripBf maybeEdgeList = maybeEdgeList >>= edgeListToGraph <&> graphToEdgeListBf
+    roundTripDf maybeEdgeList = maybeEdgeList >>= edgeListToGraph <&> graphToEdgeListDf
     input :: EdgeList =
-      Map.fromList
-        [ (1, [2, 3]),
-          (2, [1, 3]),
-          (3, [1, 2])
-        ]
+      fromList $ map createEdges [1 .. 10_000]
+      where
+        createEdges i = (i, [j | j <- [i .. i + 50], j /= i && j <= 10_000])
