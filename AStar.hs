@@ -106,13 +106,14 @@ pathAStar :: Grid -> Coord -> Coord -> Maybe Path
 pathAStar grid start goal =
   pathAStar' (PSQ.singleton start (0, 0)) [(start, [])]
   where
-    -- PSQ Coord (a* hueristic, (-1) * age)
-    -- Need inverse of age as a tiebreaker so that newer entries with the same heuristic value come first
+    -- PSQ Coord ((current path cost, A* heuristic), A* heuristic)
+    -- Uses A* heuristic as a tiebreaker for paths with the same (cost + heuristic)
+    -- This dramatically improves A* performance in open areas where there are a high number valid of solutions all of the same length
     pathAStar' :: PSQ Coord (Int, Int) -> Map Coord Path -> Maybe Path
     pathAStar' queue paths =
       case PSQ.minView queue of
         Nothing -> Nothing
-        Just (curCell :-> (_, age), queueTail) ->
+        Just (curCell :-> _, queueTail) ->
           let curPath = paths Map.! curCell
            in if curCell == goal
                 then Just curPath
@@ -121,7 +122,11 @@ pathAStar grid start goal =
                       updatedPaths = Map.union paths $ fromList $ map (,curPath Seq.|> curCell) unvisitedNeighbours
                       updatedQueue =
                         foldl'
-                          (\queue' unvisitedNeighbour -> PSQ.insert unvisitedNeighbour (length (updatedPaths Map.! curCell) + manhattanDistance unvisitedNeighbour goal, age - 1) queue')
+                          ( \queue' unvisitedNeighbour ->
+                              let curPathCost = length (updatedPaths Map.! curCell)
+                                  heuristic = manhattanDistance unvisitedNeighbour goal
+                               in PSQ.insert unvisitedNeighbour (curPathCost + heuristic, heuristic) queue'
+                          )
                           queueTail
                           unvisitedNeighbours
                    in pathAStar' updatedQueue updatedPaths
@@ -170,7 +175,7 @@ main = do
       case pathFn g start goal of
         Nothing -> putStrLn "No path found"
         Just path -> do
-          putStrLn $ renderPath g path
+          putStr $ renderPath g path
           putStrLn $ show (length path) ++ " steps"
 
     printHugePath pathFn =
