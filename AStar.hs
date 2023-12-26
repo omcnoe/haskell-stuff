@@ -5,6 +5,7 @@ module Main (main) where
 import Data.Array (Array)
 import Data.Array qualified as Arr
 import Data.Foldable (Foldable (foldl'))
+import Data.Graph.AStar (aStar)
 import Data.Map (Map)
 import Data.Map qualified as Map
 import Data.PSQueue (Binding ((:->)), PSQ)
@@ -76,7 +77,7 @@ pathBfs grid start goal =
     pathBfs' (curCell :<| queue) paths =
       let curPath = paths Map.! curCell
        in if curCell == goal
-            then Just $ curPath Seq.|> curCell
+            then Just curPath
             else
               let unvisitedNeighbours = filter (`Map.notMember` paths) (getNeighbours grid curCell)
                   unvisitedNeighboursPaths = fromList $ map (,curPath Seq.|> curCell) unvisitedNeighbours
@@ -93,7 +94,7 @@ pathDfs grid start goal =
     pathDfs' (curCell :<| queue) paths =
       let curPath = paths Map.! curCell
        in if curCell == goal
-            then Just $ curPath Seq.|> curCell
+            then Just curPath
             else
               let unvisitedNeighbours = filter (`Map.notMember` paths) (getNeighbours grid curCell)
                   unvisitedNeighboursPaths = fromList $ map (,curPath Seq.|> curCell) unvisitedNeighbours
@@ -114,7 +115,7 @@ pathAStar grid start goal =
         Just (curCell :-> (_, age), queueTail) ->
           let curPath = paths Map.! curCell
            in if curCell == goal
-                then Just $ curPath Seq.|> curCell
+                then Just curPath
                 else
                   let unvisitedNeighbours = filter (`Map.notMember` paths) (getNeighbours grid curCell)
                       updatedPaths = Map.union paths $ fromList $ map (,curPath Seq.|> curCell) unvisitedNeighbours
@@ -125,6 +126,18 @@ pathAStar grid start goal =
                           unvisitedNeighbours
                    in pathAStar' updatedQueue updatedPaths
 
+    manhattanDistance (x1, y1) (x2, y2) = abs (x1 - x2) + abs (y1 - y2)
+
+pathAStarThirdPartyLib :: Grid -> Coord -> Coord -> Maybe Path
+pathAStarThirdPartyLib grid start goal =
+  fromList
+    <$> aStar
+      (fromList . getNeighbours grid)
+      (\_ _ -> 1)
+      (manhattanDistance goal)
+      (== goal)
+      start
+  where
     manhattanDistance (x1, y1) (x2, y2) = abs (x1 - x2) + abs (y1 - y2)
 
 main :: IO ()
@@ -141,23 +154,30 @@ main = do
   putStrLn "\nA* Path:"
   printPath pathAStar
 
+  putStrLn "\nA* Path (using third party library):"
+  printPath pathAStarThirdPartyLib
+
   putStrLn $ "\nA* huge grid (" ++ show hugeSize ++ "x" ++ show hugeSize ++ ") Path:"
   printHugePath pathAStar
   putStrLn "BFS and DFS would bog down here due to the size of the grid"
   putStrLn "This is near limit of A*, beyond this a smarter approach like HPA* is needed"
+
+  putStrLn $ "\nA* huge grid (" ++ show hugeSize ++ "x" ++ show hugeSize ++ ") Path (using third party library):"
+  printHugePath pathAStarThirdPartyLib
+  putStrLn "Much slower than my implementation :)"
   where
     printPath pathFn =
       case pathFn g start goal of
         Nothing -> putStrLn "No path found"
         Just path -> do
           putStrLn $ renderPath g path
-          putStrLn $ show (length path - 1) ++ " steps"
+          putStrLn $ show (length path) ++ " steps"
 
     printHugePath pathFn =
       case pathFn hugeG hugeStart hugeGoal of
         Nothing -> putStrLn "No path found"
         Just path -> do
-          putStrLn $ show (length path - 1) ++ " steps"
+          putStrLn $ show (length path) ++ " steps"
 
     (g, (start, goal)) =
       parseGrid
