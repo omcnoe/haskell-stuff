@@ -2,19 +2,22 @@
 
 module Main (main) where
 
+import Data.Array (Array)
+import Data.Array qualified as Arr
+import Data.Foldable (Foldable (foldl'))
 import Data.Map (Map)
 import Data.Map qualified as Map
 import Data.PSQueue (Binding ((:->)), PSQ)
 import Data.PSQueue qualified as PSQ
 import Data.Sequence (Seq ((:<|)))
 import Data.Sequence qualified as Seq
-import GHC.IsList (IsList (fromList))
+import GHC.IsList (IsList (fromList, toList))
 
 data Cell = Empty | Wall | Start | Goal | Path deriving (Eq, Show)
 
 type Coord = (Int, Int)
 
-type Grid = Map Coord Cell
+type Grid = Array Coord Cell
 
 type Path = Seq Coord
 
@@ -37,30 +40,32 @@ renderCell c =
     Goal -> 'G'
     Path -> '.'
 
-parseGrid :: String -> (Grid, ([Coord], [Coord]))
+parseGrid :: String -> (Grid, (Coord, Coord))
 parseGrid str =
-  let grid = [((x, y), parseCell c) | (y, line) <- zip [0 ..] (lines str), (x, c) <- zip [0 ..] line]
-      startXYs = [xy | (xy, cell) <- grid, cell == Start]
-      goalXYs = [xy | (xy, cell) <- grid, cell == Goal]
-   in (fromList grid, (startXYs, goalXYs))
+  (Arr.array ((0, 0), (length (head (lines str)) - 1, length (lines str) - 1)) grid, (startXY, goalXY))
+  where
+    grid = [((x, y), parseCell c) | (y, line) <- zip [0 ..] (lines str), (x, c) <- zip [0 ..] line]
+    -- no Start/Goal is an invalid Grid
+    startXY = fst $ head $ filter ((==) Start . snd) grid
+    goalXY = fst $ head $ filter ((==) Goal . snd) grid
 
 renderGrid :: Grid -> String
 renderGrid grid =
-  let ((maxX, maxY), _) = Map.findMax grid
-   in unlines [[renderCell (grid Map.! (x, y)) | x <- [0 .. maxX]] | y <- [0 .. maxY]]
+  unlines [[renderCell (grid Arr.! (x, y)) | x <- [0 .. maxX]] | y <- [0 .. maxY]]
+  where
+    (_, (maxX, maxY)) = Arr.bounds grid
 
-renderPath :: Grid -> [Coord] -> String
+renderPath :: Grid -> Path -> String
 renderPath grid path =
-  renderGrid $ Map.unionWith (\c1 c2 -> if c2 == Start || c2 == Goal then c2 else c1) (fromList (map (,Path) path)) grid
+  renderGrid $ grid Arr.// map (\co -> let gc = grid Arr.! co in if gc == Start || gc == Goal then (co, gc) else (co, Path)) (toList path)
 
 getNeighbours :: Grid -> Coord -> [Coord]
 getNeighbours grid (x, y) =
   filter
-    ( \xy' -> case Map.lookup xy' grid of
-        Nothing -> False
-        Just c -> c /= Wall
-    )
+    (\(x', y') -> (x' >= lowerX && x' <= upperX && y' >= lowerY && y' <= upperY) && grid Arr.! (x', y') /= Wall)
     [(x - 1, y), (x + 1, y), (x, y - 1), (x, y + 1)]
+  where
+    ((lowerX, lowerY), (upperX, upperY)) = Arr.bounds grid
 
 pathBfs :: Grid -> Coord -> Coord -> Maybe Path
 pathBfs grid start goal =
@@ -98,13 +103,15 @@ pathDfs grid start goal =
 
 pathAStar :: Grid -> Coord -> Coord -> Maybe Path
 pathAStar grid start goal =
-  pathAStar' (PSQ.singleton start (-1)) [(start, [])]
+  pathAStar' (PSQ.singleton start (0, 0)) [(start, [])]
   where
-    pathAStar' :: PSQ Coord Int -> Map Coord Path -> Maybe Path
+    -- PSQ Coord (a* hueristic, (-1) * age)
+    -- Need inverse of age as a tiebreaker so that newer entries with the same heuristic value come first
+    pathAStar' :: PSQ Coord (Int, Int) -> Map Coord Path -> Maybe Path
     pathAStar' queue paths =
       case PSQ.minView queue of
         Nothing -> Nothing
-        Just (curCell :-> _, queueTail) ->
+        Just (curCell :-> (_, age), queueTail) ->
           let curPath = paths Map.! curCell
            in if curCell == goal
                 then Just $ curPath Seq.|> curCell
@@ -112,10 +119,8 @@ pathAStar grid start goal =
                   let unvisitedNeighbours = filter (`Map.notMember` paths) (getNeighbours grid curCell)
                       updatedPaths = Map.union paths $ fromList $ map (,curPath Seq.|> curCell) unvisitedNeighbours
                       updatedQueue =
-                        foldr
-                          -- TODO why is this so damn slow
-                          -- (\unvisitedNeighbour queue' -> PSQ.insert unvisitedNeighbour (length (updatedPaths Map.! unvisitedNeighbour) + manhattanDistance unvisitedNeighbour goal) queue')
-                          (\unvisitedNeighbour queue' -> PSQ.insert unvisitedNeighbour (manhattanDistance unvisitedNeighbour goal) queue')
+                        foldl'
+                          (\queue' unvisitedNeighbour -> PSQ.insert unvisitedNeighbour (length (updatedPaths Map.! curCell) + manhattanDistance unvisitedNeighbour goal, age - 1) queue')
                           queueTail
                           unvisitedNeighbours
                    in pathAStar' updatedQueue updatedPaths
@@ -125,46 +130,51 @@ pathAStar grid start goal =
 main :: IO ()
 main = do
   putStrLn "Grid:"
-  -- putStrLn $ renderGrid g
+  putStrLn $ renderGrid g
 
-  putStrLn "BFS Path:"
-  case pathBfs g start goal of
-    Nothing ->
-      putStrLn "No path found"
-    Just path -> do
-      -- putStrLn $ renderPath g path
-      putStrLn $ show (length path) ++ " steps\n"
+  putStrLn "\nBFS Path:"
+  printPath pathBfs
 
-  putStrLn "DFS Path:"
-  case pathDfs g start goal of
-    Nothing -> putStrLn "No path found"
-    Just path -> do
-      -- putStrLn $ renderPath g path
-      putStrLn $ show (length path) ++ " steps\n"
+  putStrLn "\nDFS Path:"
+  printPath pathDfs
 
-  putStrLn "A* Path:"
-  case pathAStar g start goal of
-    Nothing -> putStrLn "No path found"
-    Just path -> do
-      -- putStrLn $ renderPath g path
-      putStrLn $ show (length path) ++ " steps\n"
+  putStrLn "\nA* Path:"
+  printPath pathAStar
+
+  putStrLn $ "\nA* huge grid (" ++ show hugeSize ++ "x" ++ show hugeSize ++ ") Path:"
+  printHugePath pathAStar
+  putStrLn "BFS and DFS would bog down here due to the size of the grid"
+  putStrLn "This is near limit of A*, beyond this a smarter approach like HPA* is needed"
   where
-    g = fromList [((x :: Int, y :: Int), Empty) | x <- [0 .. 1000], y <- [0 .. 1000]]
-    start = (0, 0)
-    goal = (999, 999)
+    printPath pathFn =
+      case pathFn g start goal of
+        Nothing -> putStrLn "No path found"
+        Just path -> do
+          putStrLn $ renderPath g path
+          putStrLn $ show (length path - 1) ++ " steps"
 
--- (g, _) =
---   parseGrid
---     "\
---     \S    #     \n\
---     \     #     \n\
---     \           \n\
---     \     #     \n\
---     \     #     \n\
---     \## ##### ##\n\
---     \     #     \n\
---     \     #     \n\
---     \           \n\
---     \     #     \n\
---     \     #    G\n\
---     \"
+    printHugePath pathFn =
+      case pathFn hugeG hugeStart hugeGoal of
+        Nothing -> putStrLn "No path found"
+        Just path -> do
+          putStrLn $ show (length path - 1) ++ " steps"
+
+    (g, (start, goal)) =
+      parseGrid
+        "\
+        \S    #     \n\
+        \     #     \n\
+        \           \n\
+        \     #     \n\
+        \     #     \n\
+        \## ##### ##\n\
+        \     #     \n\
+        \     #     \n\
+        \           \n\
+        \     #     \n\
+        \     #    G"
+
+    hugeSize = 1000
+    hugeStart = (0, 0)
+    hugeGoal = (hugeSize, hugeSize)
+    hugeG = Arr.array ((0, 0), (hugeSize, hugeSize)) [((x, y), if (x, y) == hugeStart then Start else if (x, y) == hugeGoal then Goal else Empty) | x <- [0 .. hugeSize], y <- [0 .. hugeSize]]

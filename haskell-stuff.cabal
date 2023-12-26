@@ -10,6 +10,7 @@ executable astar
     main-is:          AStar.hs
     build-depends:
         base       ^>=4.18.1.0,
+        array      ^>=0.5.5.0,
         containers ^>=0.6.8,
         PSQueue    ^>=1.2.0
     default-language: GHC2021
