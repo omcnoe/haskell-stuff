@@ -148,26 +148,32 @@ pathAStarThirdPartyLib grid start goal =
 main :: IO ()
 main = do
   putStrLn "Grid:"
-  putStrLn $ renderGrid g
+  putStr $ renderGrid g
+  putStrLn ""
 
-  putStrLn "\nBFS Path:"
+  putStrLn "BFS Path:"
   printPath pathBfs
+  putStrLn ""
 
-  putStrLn "\nDFS Path:"
+  putStrLn "DFS Path:"
   printPath pathDfs
+  putStrLn ""
 
-  putStrLn "\nA* Path:"
+  putStrLn "A* Path:"
   printPath pathAStar
+  putStrLn ""
 
-  putStrLn "\nA* Path (using third party library):"
+  putStrLn "A* Path (using third party library):"
   printPath pathAStarThirdPartyLib
+  putStrLn ""
 
-  putStrLn $ "\nA* huge grid (" ++ show hugeSize ++ "x" ++ show hugeSize ++ ") Path:"
+  putStrLn $ "A* huge grid (" ++ show hugeSize ++ "x" ++ show hugeSize ++ ") Path:"
   printHugePath pathAStar
   putStrLn "BFS and DFS would bog down here due to the size of the grid"
   putStrLn "This is near limit of A*, beyond this a smarter approach like HPA* is needed"
+  putStrLn ""
 
-  putStrLn $ "\nA* huge grid (" ++ show hugeSize ++ "x" ++ show hugeSize ++ ") Path (using third party library):"
+  putStrLn $ "A* huge grid (" ++ show hugeSize ++ "x" ++ show hugeSize ++ ") Path (using third party library):"
   printHugePath pathAStarThirdPartyLib
   putStrLn "Much slower than my implementation :)"
   where
