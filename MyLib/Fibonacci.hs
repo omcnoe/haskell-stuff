@@ -1,7 +1,6 @@
-{-# LANGUAGE CApiFFI #-}
 {-# LANGUAGE ForeignFunctionInterface #-}
 
-module MyLib.Fibonacci where
+module Fibonacci where
 
 import Foreign (Ptr, Storable (poke))
 import Foreign.C.Types (CDouble, CInt (..), CULLong)
@@ -9,7 +8,7 @@ import Foreign.C.Types (CDouble, CInt (..), CULLong)
 fib :: (Integral a) => [a]
 fib = 0 : 1 : zipWith (+) fib (tail fib)
 
-foreign export capi fibonacci :: CInt -> Ptr CULLong -> Ptr CDouble -> IO CInt
+foreign export ccall fibonacci :: CInt -> Ptr CULLong -> Ptr CDouble -> IO CInt
 
 fibonacci :: CInt -> Ptr CULLong -> Ptr CDouble -> IO CInt
 fibonacci n intPtr dblPtr
