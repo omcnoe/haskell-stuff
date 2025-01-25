@@ -12,14 +12,14 @@ foreign-library myLib
         options: standalone
         mod-def-file: MyLib/MyLib.def
     other-modules:    Fibonacci
-    build-depends:    base ^>=4.18.1.0
+    build-depends:    base ^>=4.19.2.0
     hs-source-dirs:   MyLib
     default-language: GHC2021
 
 executable astar
     main-is:          AStar.hs
     build-depends:
-        base       ^>=4.18.1.0,
+        base       ^>=4.19.2.0,
         array      ^>=0.5.5.0,
         containers ^>=0.6.8,
         PSQueue    ^>=1.2.0,
@@ -30,7 +30,7 @@ executable astar
 executable graph
     main-is:          Graph.hs
     build-depends:
-        base       ^>=4.18.1.0,
+        base       ^>=4.19.2.0,
         containers ^>=0.6.8
     default-language: GHC2021
     ghc-options:      -Wall
@@ -38,14 +38,14 @@ executable graph
 executable primes
     main-is:          Primes.hs
     build-depends:
-        base       ^>=4.18.1.0,
+        base       ^>=4.19.2.0,
         containers ^>=0.6.8
     default-language: GHC2021
     ghc-options:      -Wall
 
 executable y
     main-is:          Y.hs
-    build-depends:    base ^>=4.18.1.0
+    build-depends:    base ^>=4.19.2.0
     default-language: GHC2021
     -- -O0 as Y combinator breaks optimizer :) "Simplifier ticks exhausted"
     ghc-options:      -Wall -O0
